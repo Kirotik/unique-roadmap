@@ -1,0 +1,94 @@
+---
+interface Props {
+  emoji: string;
+  title: string;
+  phase: string;
+  tags: string[];
+  status: 'todo' | 'in_progress' | 'done';
+  id: string;
+}
+
+const { emoji, title, phase, tags, status, id } = Astro.props;
+
+const statusConfig = {
+  todo: {
+    badge: 'bg-flieder-500/15 text-flieder-400 ring-1 ring-flieder-500/20',
+    glow: 'group-hover:shadow-glow-sm',
+  },
+  in_progress: {
+    badge: 'bg-accent-warm/15 text-accent-warm ring-1 ring-accent-warm/20',
+    glow: 'group-hover:shadow-[0_0_24px_-8px_rgba(212,165,116,0.3)]',
+  },
+  done: {
+    badge: 'bg-accent-success/15 text-accent-success ring-1 ring-accent-success/20',
+    glow: 'group-hover:shadow-[0_0_24px_-8px_rgba(74,222,128,0.25)]',
+  },
+};
+
+const config = statusConfig[status];
+---
+
+<article 
+  class="card group relative cursor-pointer"
+  data-id={id}
+  role="button"
+  tabindex="0"
+>
+  <!-- Subtle top edge highlight -->
+  <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+  
+  <div class="relative flex items-start gap-4">
+    <!-- Icon container with subtle ring -->
+    <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-white/[0.03] ring-1 ring-white/[0.06] flex items-center justify-center">
+      <span class="text-xl">{emoji}</span>
+    </div>
+    
+    <div class="flex-1 min-w-0 pt-0.5">
+      <h3 class="text-[15px] font-medium text-white/90 leading-tight tracking-tight group-hover:text-white transition-colors duration-200">
+        {title}
+      </h3>
+      
+      <div class="flex flex-wrap items-center gap-2 mt-3">
+        <span class={`pill ${config.badge}`}>
+          {phase}
+        </span>
+        {tags.map(tag => (
+          <span class="pill bg-white/[0.03] text-white/40 ring-1 ring-white/[0.06]">
+            {tag}
+          </span>
+        ))}
+      </div>
+    </div>
+    
+    <!-- Arrow indicator -->
+    <div class="flex-shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+      <svg class="w-4 h-4 text-white/30" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+      </svg>
+    </div>
+  </div>
+</article>
+
+<style>
+  .card {
+    @apply relative p-4 rounded-xl;
+    background: rgba(18, 18, 26, 0.5);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    transition: all 0.2s ease-out;
+  }
+  
+  .card:hover {
+    background: rgba(18, 18, 26, 0.7);
+    border-color: rgba(154, 125, 216, 0.2);
+    transform: translateY(-1px);
+  }
+  
+  .card:active {
+    transform: translateY(0);
+  }
+  
+  .pill {
+    @apply inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium tracking-wide;
+  }
+</style>
