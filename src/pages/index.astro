@@ -20,24 +20,45 @@ const iconMap: Record<string, { icon: string; color: string }> = {
   '⚡': { icon: 'zap', color: 'amber' },
   '🧘': { icon: 'brain', color: 'cyan' },
   '🌐': { icon: 'globe', color: 'blue' },
+  '💊': { icon: 'pill', color: 'emerald' },
+  '😴': { icon: 'moon', color: 'blue' },
+  '🎤': { icon: 'mic', color: 'rose' },
+  '🏭': { icon: 'factory', color: 'amber' },
+  '📅': { icon: 'calendar', color: 'blue' },
+  '🎮': { icon: 'gamepad', color: 'violet' },
 };
+
+function parseMarkdown(md: string): string {
+  if (!md) return '<p class="text-white/40">Beschreibung folgt...</p>';
+  
+  return md
+    .replace(/^### (.+)$/gm, '<h4 class="text-white/80 font-semibold text-sm mt-6 mb-2">$1</h4>')
+    .replace(/^## (.+)$/gm, '<h3 class="text-white/90 font-semibold text-base mt-8 mb-3 pb-2 border-b border-white/[0.06]">$1</h3>')
+    .replace(/^# (.+)$/gm, '<h2 class="text-white font-bold text-lg mt-8 mb-4">$1</h2>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white/80 font-medium">$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^- (.+)$/gm, '<li class="flex items-start gap-2 text-white/50"><span class="text-flieder-400 mt-1.5">•</span><span>$1</span></li>')
+    .replace(/(<li.*<\/li>\n?)+/g, '<ul class="space-y-1.5 my-4">$&</ul>')
+    .replace(/→/g, '<span class="text-flieder-400">→</span>')
+    .split('\n\n')
+    .map(block => {
+      if (block.startsWith('<h') || block.startsWith('<ul')) return block;
+      if (block.trim() === '') return '';
+      return '<p class="text-white/50 leading-relaxed">' + block.replace(/\n/g, ' ') + '</p>';
+    })
+    .join('\n');
+}
 
 let features: any[] = [];
 let error: string | null = null;
 
 try {
-  const res = await fetch(`https://api.clickup.com/api/v2/list/${LIST_ID}/task?archived=false&include_markdown_description=true`, {
-    headers: {
-  'Authorization': CLICKUP_API_TOKEN,
-  'Content-Type': 'application/json'
-}
+  const res = await fetch('https://api.clickup.com/api/v2/list/' + LIST_ID + '/task?archived=false&include_markdown_description=true&include_closed=true', {
+    headers: { 'Authorization': CLICKUP_API_TOKEN, 'Content-Type': 'application/json' }
   });
-  
   const data = await res.json();
-  
-  if (!res.ok) throw new Error(`ClickUp API Error: ${res.status}`);
+  if (!res.ok) throw new Error('ClickUp API Error: ' + res.status);
 
-  
   features = data.tasks.map((task: any) => {
     const emoji = task.name.match(/^[\p{Emoji}]/u)?.[0] || '✨';
     const iconData = iconMap[emoji] || { icon: 'star', color: 'violet' };
@@ -48,32 +69,35 @@ try {
     if (taskStatus.includes('done') || taskStatus.includes('complete') || taskStatus.includes('live')) status = 'done';
     
     const phaseMatch = task.name.match(/\(Phase \d+[^)]*\)/);
-    const phase = phaseMatch ? phaseMatch[0].replace(/[()]/g, '') : 'Geplant';
-    
+let phase = 'Geplant';
+if (status === 'done') {
+  phase = 'Live';
+} else if (status === 'in_progress') {
+  phase = phaseMatch ? phaseMatch[0].replace(/[()]/g, '') : 'In Arbeit';
+} else if (phaseMatch) {
+  phase = phaseMatch[0].replace(/[()]/g, '');
+}
     const tags = task.tags?.map((t: any) => t.name) || [];
+    const rawDescription = task.markdown_description || task.description || task.text_content || '';
     
     return {
       id: task.id,
       name: task.name.replace(/^[\p{Emoji}]\s*(EPIC:|FEATURE:)?\s*/u, '').replace(/\s*\([^)]+\)$/, ''),
-      icon: iconData.icon,
-      color: iconData.color,
-      status,
-      phase,
+      icon: iconData.icon, color: iconData.color, status, phase,
       tags: tags.length > 0 ? tags : ['App'],
-      description: task.markdown_description || task.description || task.text_content || 'Beschreibung folgt...',
+      description: rawDescription,
+      descriptionHtml: parseMarkdown(rawDescription),
     };
   });
-} catch (e: any) {
-  error = e.message;
-}
+} catch (e: any) { error = e.message; }
 
 const tabs = [
-  { id: 'todo', label: 'Geplant', count: features.filter(f => f.status === 'todo').length },
-  { id: 'in_progress', label: 'In Arbeit', count: features.filter(f => f.status === 'in_progress').length },
   { id: 'done', label: 'Live', count: features.filter(f => f.status === 'done').length },
+  { id: 'in_progress', label: 'In Arbeit', count: features.filter(f => f.status === 'in_progress').length },
+  { id: 'todo', label: 'Geplant', count: features.filter(f => f.status === 'todo').length },
 ];
 
-const WHATSAPP = '4915123456789';
+const WHATSAPP = '491624077947';
 const EMAIL = 'dominik@unique-coaching.com';
 
 const icons: Record<string, string> = {
@@ -96,6 +120,12 @@ const icons: Record<string, string> = {
   'star': '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
   'chevron-right': '<path d="m9 18 6-6-6-6"/>',
   'mail': '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  'pill': '<path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/>',
+  'moon': '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  'mic': '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>',
+  'factory': '<path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M17 18h1"/><path d="M12 18h1"/><path d="M7 18h1"/>',
+  'calendar': '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
+  'gamepad': '<line x1="6" x2="10" y1="12" y2="12"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="15" x2="15.01" y1="13" y2="13"/><line x1="18" x2="18.01" y1="11" y2="11"/><rect width="20" height="12" x="2" y="6" rx="2"/>',
 };
 ---
 
@@ -103,308 +133,192 @@ const icons: Record<string, string> = {
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>What's Next · UNIQUE</title>
-  
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <meta name="theme-color" content="#0a0a0b">
 </head>
 
 <body class="bg-bg min-h-screen text-white antialiased selection:bg-flieder-500/30">
-  
   <div class="fixed inset-0 pointer-events-none">
     <div class="absolute inset-0 opacity-[0.015]" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E');"></div>
     <div class="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full bg-flieder-600/[0.07] blur-[120px]"></div>
     <div class="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-accent-blue/[0.05] blur-[100px]"></div>
   </div>
 
-  <div class="relative z-10 max-w-lg mx-auto px-6 py-16">
-    
-    <header class="mb-16 animate-fade-in">
-      <div class="flex justify-center mb-12">
+  <div class="relative z-10 max-w-lg mx-auto px-6 py-12 sm:py-16">
+    <header class="mb-12 animate-fade-in">
+      <div class="flex justify-center mb-8">
         <div class="relative group">
           <div class="absolute inset-0 bg-flieder-500/20 rounded-3xl blur-2xl group-hover:bg-flieder-500/30 transition-colors duration-500"></div>
-          <img src="/logo.svg" alt="UNIQUE Coaching" class="relative w-40 h-40 object-contain" />
+          <img src="/logo.svg" alt="UNIQUE Coaching" class="relative w-32 h-32 sm:w-40 sm:h-40 object-contain" />
         </div>
       </div>
-      
-      <div class="text-center space-y-4">
-        <h1 class="text-5xl sm:text-6xl font-bold tracking-tighter bg-gradient-to-r from-white via-flieder-300 to-flieder-400 bg-clip-text text-transparent">
-          What's Next
-        </h1>
-        <p class="text-white/60 text-base tracking-wide">
-          Dein Feedback formt die App
-        </p>
+      <div class="text-center space-y-3">
+        <h1 class="text-4xl sm:text-5xl font-bold tracking-tighter bg-gradient-to-r from-white via-flieder-300 to-flieder-400 bg-clip-text text-transparent">What's Next</h1>
+        <p class="text-white/50 text-sm sm:text-base">Dein Feedback formt die App</p>
       </div>
     </header>
 
-    {error && (
-      <div class="mb-8 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-        Fehler beim Laden: {error}
-      </div>
-    )}
+    {error && (<div class="mb-8 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">Fehler beim Laden: {error}</div>)}
 
-    <nav class="mb-10 animate-fade-in" style="animation-delay: 100ms;">
-      <div class="flex gap-2">
+    <nav class="mb-8 animate-fade-in" style="animation-delay: 100ms;">
+      <div class="flex gap-1.5 p-1 bg-white/[0.02] rounded-xl border border-white/[0.04]">
         {tabs.map((tab, i) => (
-          <button 
-            class={`tab group relative flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${i === 0 ? 'active' : ''}`}
-            data-tab={tab.id}
-          >
+          <button class={`tab group relative flex-1 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 ${i === 0 ? 'active' : ''}`} data-tab={tab.id}>
             <span class="relative z-10 tab-label">{tab.label}</span>
-            <span class="relative z-10 tab-count font-mono text-xs ml-2">{tab.count}</span>
-            <div class="tab-bg absolute inset-0 rounded-xl bg-white/[0.05] border border-white/[0.08] opacity-0 transition-opacity duration-300"></div>
+            <span class="relative z-10 tab-count font-mono text-[10px] sm:text-xs ml-1.5 opacity-50">{tab.count}</span>
+            <div class="tab-bg absolute inset-0 rounded-lg bg-white/[0.06] opacity-0 transition-opacity duration-300"></div>
           </button>
         ))}
       </div>
     </nav>
 
-    <div class="space-y-4" id="cards">
-      {features.filter(f => f.status === 'todo').map((feature, i) => (
-        <article 
-          data-status={feature.status} 
-          data-feature={JSON.stringify(feature)}
-          class="card-wrapper animate-slide-up"
-          style={`animation-delay: ${150 + i * 80}ms;`}
-        >
+    <div class="flex items-center justify-center gap-2 mb-6 animate-fade-in" style="animation-delay: 150ms;">
+      <span class="text-[10px] text-white/30 font-mono uppercase tracking-wider">{features.length} Features insgesamt</span>
+    </div>
+
+    <div class="space-y-3" id="cards">
+      {features.filter(f => f.status === 'done').map((feature, i) => (
+        <article data-status={feature.status} data-feature={JSON.stringify({...feature, descriptionHtml: feature.descriptionHtml})} class="card-wrapper animate-slide-up" style={`animation-delay: ${150 + i * 60}ms;`}>
           <div class={`card card--${feature.color} group`} data-id={feature.id}>
             <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent"></div>
-            
-            <div class="flex items-start gap-5">
+            <div class="flex items-start gap-4">
               <div class={`icon-box icon-box--${feature.color}`}>
                 <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" set:html={icons[feature.icon] || icons['star']} />
               </div>
-              
-              <div class="flex-1 min-w-0 space-y-3">
-                <h3 class="text-[15px] font-semibold text-white/90 leading-tight tracking-tight">
-                  {feature.name}
-                </h3>
-                
-                <div class="flex flex-wrap items-center gap-2">
+              <div class="flex-1 min-w-0 space-y-2">
+                <h3 class="text-[15px] font-semibold text-white/90 leading-snug tracking-tight pr-6">{feature.name}</h3>
+                <div class="flex flex-wrap items-center gap-1.5">
                   <span class="tag tag--phase font-mono uppercase tracking-wider">{feature.phase}</span>
-                  {feature.tags.map((tag: string) => (
-                    <span class="tag tag--default">{tag}</span>
-                  ))}
+                  {feature.tags.slice(0, 2).map((tag: string) => (<span class="tag tag--default">{tag}</span>))}
                 </div>
               </div>
-              
-              <div class="flex-shrink-0 self-center opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-300">
-                <svg class="w-4 h-4 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" set:html={icons['chevron-right']} />
+              <div class="flex-shrink-0 self-center">
+                <svg class="w-4 h-4 text-white/20 group-hover:text-white/40 transition-all" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" set:html={icons['chevron-right']} />
               </div>
             </div>
-            
             <div class={`card-glow card-glow--${feature.color}`}></div>
           </div>
         </article>
       ))}
     </div>
 
-    <div id="empty-state" class="hidden py-20 text-center">
+    <div id="empty-state" class="hidden py-16 text-center">
       <p class="text-white/30 text-sm">Keine Features in dieser Kategorie</p>
     </div>
 
-    <footer class="mt-20 pt-8 border-t border-white/[0.04]">
+    <footer class="mt-16 pt-6 border-t border-white/[0.04]">
       <div class="flex items-center justify-between">
-        <p class="text-[10px] text-white/20 font-mono uppercase tracking-wider">© 2026 Unique Coaching</p>
-        <div class="flex items-center gap-1">
-          <span class="w-1.5 h-1.5 rounded-full bg-accent-emerald animate-pulse"></span>
-          <span class="text-[10px] text-white/30">Live</span>
+        <p class="text-[10px] text-white/20 font-mono uppercase tracking-wider">© 2026 Unique</p>
+        <div class="flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-[10px] text-white/30 font-mono">Live</span>
         </div>
       </div>
     </footer>
   </div>
 
   <div id="modal" class="fixed inset-0 z-50 opacity-0 invisible transition-all duration-300">
-    <div class="absolute inset-0 bg-black/90 backdrop-blur-sm" id="modal-backdrop"></div>
-    
-    <div class="modal-sheet absolute bottom-0 left-0 right-0 max-h-[90vh] rounded-t-3xl overflow-hidden translate-y-full transition-transform duration-300 ease-out">
-      <div class="flex justify-center py-5 bg-bg-elevated border-b border-white/[0.04]">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" id="modal-backdrop"></div>
+    <div class="modal-sheet absolute bottom-0 left-0 right-0 max-h-[85vh] rounded-t-2xl overflow-hidden translate-y-full transition-transform duration-300 ease-out">
+      <div class="modal-handle flex justify-center py-4 bg-bg-elevated cursor-grab" id="modal-handle">
         <div class="w-10 h-1 rounded-full bg-white/20"></div>
       </div>
-      
-      <div class="px-8 py-8 pb-12 bg-bg-elevated overflow-y-auto max-h-[calc(90vh-60px)]">
-        <div class="flex items-start gap-5 mb-8">
+      <button id="modal-close" class="absolute top-3 right-4 p-2 rounded-full bg-white/[0.05] hover:bg-white/[0.1] transition-colors z-10">
+        <svg class="w-4 h-4 text-white/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+      <div class="modal-content px-6 pb-8 bg-bg-elevated overflow-y-auto overscroll-contain" style="max-height: calc(85vh - 56px);">
+        <div class="flex items-start gap-4 mb-6 pt-2">
           <div class="icon-box-lg" id="modal-icon-box">
-            <svg class="w-6 h-6" id="modal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></svg>
+            <svg class="w-6 h-6" id="modal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"></svg>
           </div>
-          <div class="flex-1 min-w-0 space-y-4">
+          <div class="flex-1 min-w-0 space-y-3 pr-8">
             <h2 class="text-xl font-bold text-white leading-tight tracking-tight" id="modal-title"></h2>
-            <div class="flex flex-wrap gap-2" id="modal-tags"></div>
+            <div class="flex flex-wrap gap-1.5" id="modal-tags"></div>
           </div>
         </div>
-        
-        <div class="text-[15px] leading-[1.7] text-white/50 space-y-5 mb-10" id="modal-body"></div>
-        
-        <div class="relative my-10">
-          <div class="absolute inset-0 flex items-center">
-            <div class="w-full border-t border-white/[0.06]"></div>
-          </div>
-          <div class="relative flex justify-center">
-            <span class="px-4 bg-bg-elevated text-[10px] text-white/30 font-mono uppercase tracking-wider">Feedback</span>
-          </div>
+        <div class="modal-body text-[15px] leading-relaxed" id="modal-body"></div>
+        <div class="relative my-8">
+          <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-white/[0.06]"></div></div>
+          <div class="relative flex justify-center"><span class="px-4 bg-bg-elevated text-[10px] text-white/30 font-mono uppercase tracking-wider">Feedback</span></div>
         </div>
-        
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-2 gap-3">
           <a href="#" id="wa-btn" class="btn btn--whatsapp group">
-            <svg class="w-5 h-5 transition-transform group-hover:scale-110" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-            </svg>
-            <span class="font-medium">WhatsApp</span>
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            <span class="font-medium text-sm">WhatsApp</span>
           </a>
           <a href="#" id="mail-btn" class="btn btn--mail group">
-            <svg class="w-5 h-5 transition-transform group-hover:scale-110" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" set:html={icons['mail']} />
-            <span class="font-medium">E-Mail</span>
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            <span class="font-medium text-sm">E-Mail</span>
           </a>
         </div>
+        <div class="h-6"></div>
       </div>
     </div>
   </div>
 
   <style is:global>
     * { -webkit-tap-highlight-color: transparent; }
-    
-    .tab { color: rgba(255, 255, 255, 0.35); }
-    .tab:hover { color: rgba(255, 255, 255, 0.6); }
-    .tab.active { color: rgba(255, 255, 255, 0.95); }
+    body { overscroll-behavior: none; }
+    .tab { color: rgba(255,255,255,0.35); }
+    .tab:hover { color: rgba(255,255,255,0.6); }
+    .tab.active { color: rgba(255,255,255,0.95); }
     .tab.active .tab-bg { opacity: 1; }
-    .tab .tab-count { opacity: 0.5; }
-    
-    .card {
-      position: relative;
-      padding: 1.25rem;
-      border-radius: 1rem;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.04);
-    }
-    .card:hover {
-      background: rgba(255, 255, 255, 0.04);
-      border-color: rgba(255, 255, 255, 0.08);
-      transform: translateY(-2px);
-    }
-    
-    .card-glow {
-      position: absolute;
-      inset: -1px;
-      border-radius: 1rem;
-      opacity: 0;
-      transition: opacity 0.5s ease;
-      pointer-events: none;
-    }
+    .card { position: relative; padding: 1rem; border-radius: 0.875rem; cursor: pointer; transition: all 0.2s ease; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); }
+    .card:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); }
+    .card:active { transform: scale(0.98); }
+    .card-glow { position: absolute; inset: -1px; border-radius: 0.875rem; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
     .card:hover .card-glow { opacity: 1; }
-    .card-glow--violet { box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.2), 0 0 40px -15px rgba(167, 139, 250, 0.3); }
-    .card-glow--blue { box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.2), 0 0 40px -15px rgba(96, 165, 250, 0.3); }
-    .card-glow--cyan { box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.2), 0 0 40px -15px rgba(34, 211, 238, 0.3); }
-    .card-glow--emerald { box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.2), 0 0 40px -15px rgba(52, 211, 153, 0.3); }
-    .card-glow--amber { box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.2), 0 0 40px -15px rgba(251, 191, 36, 0.3); }
-    .card-glow--rose { box-shadow: inset 0 0 0 1px rgba(251, 113, 133, 0.2), 0 0 40px -15px rgba(251, 113, 133, 0.3); }
-    
-    .icon-box {
-      flex-shrink: 0;
-      width: 2.75rem;
-      height: 2.75rem;
-      border-radius: 0.75rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s ease;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-    }
-    .icon-box--violet { color: #a78bfa; }
-    .icon-box--blue { color: #60a5fa; }
-    .icon-box--cyan { color: #22d3ee; }
-    .icon-box--emerald { color: #34d399; }
-    .icon-box--amber { color: #fbbf24; }
-    .icon-box--rose { color: #fb7185; }
-    
-    .card:hover .icon-box--violet { background: rgba(167, 139, 250, 0.1); border-color: rgba(167, 139, 250, 0.2); }
-    .card:hover .icon-box--blue { background: rgba(96, 165, 250, 0.1); border-color: rgba(96, 165, 250, 0.2); }
-    .card:hover .icon-box--cyan { background: rgba(34, 211, 238, 0.1); border-color: rgba(34, 211, 238, 0.2); }
-    .card:hover .icon-box--emerald { background: rgba(52, 211, 153, 0.1); border-color: rgba(52, 211, 153, 0.2); }
-    .card:hover .icon-box--amber { background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.2); }
-    .card:hover .icon-box--rose { background: rgba(251, 113, 133, 0.1); border-color: rgba(251, 113, 133, 0.2); }
-    
-    .icon-box-lg {
-      flex-shrink: 0;
-      width: 3.5rem;
-      height: 3.5rem;
-      border-radius: 1rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-    }
-    
-    .tag {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.25rem 0.625rem;
-      border-radius: 0.5rem;
-      font-size: 10px;
-      font-weight: 500;
-    }
-    .tag--phase {
-      background: rgba(255, 255, 255, 0.04);
-      color: rgba(255, 255, 255, 0.5);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-    }
-    .tag--default {
-      background: transparent;
-      color: rgba(255, 255, 255, 0.35);
-    }
-    
-    .btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.75rem;
-      padding: 1rem 1.25rem;
-      border-radius: 0.75rem;
-      font-size: 0.875rem;
-      transition: all 0.3s ease;
-    }
-    .btn--whatsapp {
-      background: rgba(37, 211, 102, 0.1);
-      border: 1px solid rgba(37, 211, 102, 0.2);
-      color: #25D366;
-    }
-    .btn--whatsapp:hover {
-      background: rgba(37, 211, 102, 0.15);
-      border-color: rgba(37, 211, 102, 0.3);
-    }
-    .btn--mail {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      color: rgba(255, 255, 255, 0.6);
-    }
-    .btn--mail:hover {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.9);
-    }
-    
+    .card-glow--violet { box-shadow: inset 0 0 0 1px rgba(167,139,250,0.15), 0 0 30px -10px rgba(167,139,250,0.2); }
+    .card-glow--blue { box-shadow: inset 0 0 0 1px rgba(96,165,250,0.15), 0 0 30px -10px rgba(96,165,250,0.2); }
+    .card-glow--cyan { box-shadow: inset 0 0 0 1px rgba(34,211,238,0.15), 0 0 30px -10px rgba(34,211,238,0.2); }
+    .card-glow--emerald { box-shadow: inset 0 0 0 1px rgba(52,211,153,0.15), 0 0 30px -10px rgba(52,211,153,0.2); }
+    .card-glow--amber { box-shadow: inset 0 0 0 1px rgba(251,191,36,0.15), 0 0 30px -10px rgba(251,191,36,0.2); }
+    .card-glow--rose { box-shadow: inset 0 0 0 1px rgba(251,113,133,0.15), 0 0 30px -10px rgba(251,113,133,0.2); }
+    .icon-box { flex-shrink: 0; width: 2.5rem; height: 2.5rem; border-radius: 0.625rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); }
+    .icon-box--violet { color: #a78bfa; } .icon-box--blue { color: #60a5fa; } .icon-box--cyan { color: #22d3ee; } .icon-box--emerald { color: #34d399; } .icon-box--amber { color: #fbbf24; } .icon-box--rose { color: #fb7185; }
+    .card:hover .icon-box--violet { background: rgba(167,139,250,0.1); border-color: rgba(167,139,250,0.2); }
+    .card:hover .icon-box--blue { background: rgba(96,165,250,0.1); border-color: rgba(96,165,250,0.2); }
+    .card:hover .icon-box--cyan { background: rgba(34,211,238,0.1); border-color: rgba(34,211,238,0.2); }
+    .card:hover .icon-box--emerald { background: rgba(52,211,153,0.1); border-color: rgba(52,211,153,0.2); }
+    .card:hover .icon-box--amber { background: rgba(251,191,36,0.1); border-color: rgba(251,191,36,0.2); }
+    .card:hover .icon-box--rose { background: rgba(251,113,133,0.1); border-color: rgba(251,113,133,0.2); }
+    .icon-box-lg { flex-shrink: 0; width: 3rem; height: 3rem; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); }
+    .tag { display: inline-flex; align-items: center; padding: 0.2rem 0.5rem; border-radius: 0.375rem; font-size: 9px; font-weight: 500; }
+    .tag--phase { background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.06); }
+    .tag--default { background: transparent; color: rgba(255,255,255,0.35); }
+    .btn { display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.875rem 1rem; border-radius: 0.625rem; transition: all 0.2s ease; }
+    .btn--whatsapp { background: rgba(37,211,102,0.1); border: 1px solid rgba(37,211,102,0.2); color: #25D366; }
+    .btn--whatsapp:hover { background: rgba(37,211,102,0.15); border-color: rgba(37,211,102,0.3); }
+    .btn--mail { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); color: rgba(255,255,255,0.6); }
+    .btn--mail:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); color: rgba(255,255,255,0.9); }
     #modal.open { opacity: 1; visibility: visible; }
     #modal.open .modal-sheet { transform: translateY(0); }
-    
-    .animate-fade-in { opacity: 0; animation: fadeIn 0.6s ease-out forwards; }
-    .animate-slide-up { opacity: 0; animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .modal-content { -webkit-overflow-scrolling: touch; }
+    .modal-body h2 { margin-top: 1.5rem; margin-bottom: 0.75rem; }
+    .modal-body h3 { margin-top: 1.25rem; margin-bottom: 0.5rem; }
+    .modal-body h4 { margin-top: 1rem; margin-bottom: 0.375rem; }
+    .modal-body p { margin-bottom: 0.75rem; }
+    .modal-body ul { margin-bottom: 1rem; }
+    .animate-fade-in { opacity: 0; animation: fadeIn 0.5s ease-out forwards; }
+    .animate-slide-up { opacity: 0; animation: slideUp 0.4s cubic-bezier(0.16,1,0.3,1) forwards; }
     @keyframes fadeIn { to { opacity: 1; } }
-    @keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-    
-    .icon-box-lg.violet { color: #a78bfa; background: rgba(167, 139, 250, 0.1); border-color: rgba(167, 139, 250, 0.2); }
-    .icon-box-lg.blue { color: #60a5fa; background: rgba(96, 165, 250, 0.1); border-color: rgba(96, 165, 250, 0.2); }
-    .icon-box-lg.cyan { color: #22d3ee; background: rgba(34, 211, 238, 0.1); border-color: rgba(34, 211, 238, 0.2); }
-    .icon-box-lg.emerald { color: #34d399; background: rgba(52, 211, 153, 0.1); border-color: rgba(52, 211, 153, 0.2); }
-    .icon-box-lg.amber { color: #fbbf24; background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.2); }
-    .icon-box-lg.rose { color: #fb7185; background: rgba(251, 113, 133, 0.1); border-color: rgba(251, 113, 133, 0.2); }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .icon-box-lg.violet { color: #a78bfa; background: rgba(167,139,250,0.1); border-color: rgba(167,139,250,0.2); }
+    .icon-box-lg.blue { color: #60a5fa; background: rgba(96,165,250,0.1); border-color: rgba(96,165,250,0.2); }
+    .icon-box-lg.cyan { color: #22d3ee; background: rgba(34,211,238,0.1); border-color: rgba(34,211,238,0.2); }
+    .icon-box-lg.emerald { color: #34d399; background: rgba(52,211,153,0.1); border-color: rgba(52,211,153,0.2); }
+    .icon-box-lg.amber { color: #fbbf24; background: rgba(251,191,36,0.1); border-color: rgba(251,191,36,0.2); }
+    .icon-box-lg.rose { color: #fb7185; background: rgba(251,113,133,0.1); border-color: rgba(251,113,133,0.2); }
   </style>
 
   <script define:vars={{ features, WHATSAPP, EMAIL, icons }}>
     const modal = document.getElementById('modal');
+    const modalContent = document.querySelector('.modal-content');
+    const modalHandle = document.getElementById('modal-handle');
     const cardsContainer = document.getElementById('cards');
     const emptyState = document.getElementById('empty-state');
     const tabs = document.querySelectorAll('.tab');
@@ -419,38 +333,27 @@ const icons: Record<string, string> = {
 
     function renderCards(status) {
       const filtered = features.filter(f => f.status === status);
-      
-      if (filtered.length === 0) {
-        cardsContainer.innerHTML = '';
-        emptyState.classList.remove('hidden');
-        return;
-      }
-      
+      if (filtered.length === 0) { cardsContainer.innerHTML = ''; emptyState.classList.remove('hidden'); return; }
       emptyState.classList.add('hidden');
       cardsContainer.innerHTML = filtered.map((f, i) => `
-        <article data-status="${f.status}" data-feature='${JSON.stringify(f).replace(/'/g, "&#39;")}' class="card-wrapper animate-slide-up" style="animation-delay: ${i * 80}ms;">
+        <article data-status="${f.status}" data-feature='${JSON.stringify(f).replace(/'/g, "&#39;")}' class="card-wrapper animate-slide-up" style="animation-delay: ${i * 60}ms;">
           <div class="card card--${f.color} group" data-id="${f.id}">
             <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent"></div>
-            <div class="flex items-start gap-5">
-              <div class="icon-box icon-box--${f.color}">
-                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${icons[f.icon] || icons['star']}</svg>
-              </div>
-              <div class="flex-1 min-w-0 space-y-3">
-                <h3 class="text-[15px] font-semibold text-white/90 leading-tight tracking-tight">${f.name}</h3>
-                <div class="flex flex-wrap items-center gap-2">
+            <div class="flex items-start gap-4">
+              <div class="icon-box icon-box--${f.color}"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">${icons[f.icon] || icons['star']}</svg></div>
+              <div class="flex-1 min-w-0 space-y-2">
+                <h3 class="text-[15px] font-semibold text-white/90 leading-snug tracking-tight pr-6">${f.name}</h3>
+                <div class="flex flex-wrap items-center gap-1.5">
                   <span class="tag tag--phase font-mono uppercase tracking-wider">${f.phase}</span>
-                  ${f.tags.map(t => `<span class="tag tag--default">${t}</span>`).join('')}
+                  ${f.tags.slice(0, 2).map(t => `<span class="tag tag--default">${t}</span>`).join('')}
                 </div>
               </div>
-              <div class="flex-shrink-0 self-center opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-300">
-                <svg class="w-4 h-4 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icons['chevron-right']}</svg>
-              </div>
+              <div class="flex-shrink-0 self-center"><svg class="w-4 h-4 text-white/20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icons['chevron-right']}</svg></div>
             </div>
             <div class="card-glow card-glow--${f.color}"></div>
           </div>
         </article>
       `).join('');
-      
       attachCardListeners();
     }
 
@@ -464,42 +367,30 @@ const icons: Record<string, string> = {
     }
 
     function openModal(f) {
-      const iconBox = document.getElementById('modal-icon-box');
-      const iconEl = document.getElementById('modal-icon');
-      
-      iconBox.className = 'icon-box-lg ' + f.color;
-      iconEl.innerHTML = icons[f.icon] || icons['star'];
-      
+      document.getElementById('modal-icon-box').className = 'icon-box-lg ' + f.color;
+      document.getElementById('modal-icon').innerHTML = icons[f.icon] || icons['star'];
       document.getElementById('modal-title').textContent = f.name;
-      document.getElementById('modal-tags').innerHTML = 
-        `<span class="tag tag--phase font-mono uppercase tracking-wider">${f.phase}</span>` +
-        f.tags.map(t => `<span class="tag tag--default">${t}</span>`).join('');
-      
-      document.getElementById('modal-body').innerHTML = f.description
-        .split('\n\n')
-        .map(p => `<p>${p}</p>`)
-        .join('');
-      
-      const enc = encodeURIComponent(`Feedback: ${f.name}`);
-      document.getElementById('wa-btn').href = `https://wa.me/${WHATSAPP}?text=${enc}`;
-      document.getElementById('mail-btn').href = `mailto:${EMAIL}?subject=${enc}`;
-      
+      document.getElementById('modal-tags').innerHTML = `<span class="tag tag--phase font-mono uppercase tracking-wider">${f.phase}</span>` + f.tags.map(t => `<span class="tag tag--default">${t}</span>`).join('');
+      document.getElementById('modal-body').innerHTML = f.descriptionHtml;
+      const enc = encodeURIComponent('Feedback: ' + f.name);
+      document.getElementById('wa-btn').href = 'https://wa.me/' + WHATSAPP + '?text=' + enc;
+      document.getElementById('mail-btn').href = 'mailto:' + EMAIL + '?subject=' + enc;
+      modalContent.scrollTop = 0;
       modal.classList.add('open');
       document.body.style.overflow = 'hidden';
     }
 
-    function closeModal() {
-      modal.classList.remove('open');
-      document.body.style.overflow = '';
-    }
+    function closeModal() { modal.classList.remove('open'); document.body.style.overflow = ''; }
 
     document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+    document.getElementById('modal-close').addEventListener('click', closeModal);
     document.addEventListener('keydown', e => e.key === 'Escape' && closeModal());
 
-    let startY = 0;
+    let startY = 0, currentY = 0, isDragging = false;
     const sheet = document.querySelector('.modal-sheet');
-    sheet.addEventListener('touchstart', e => startY = e.touches[0].clientY, { passive: true });
-    sheet.addEventListener('touchmove', e => { if (e.touches[0].clientY - startY > 50) closeModal(); }, { passive: true });
+    modalHandle.addEventListener('touchstart', e => { startY = e.touches[0].clientY; isDragging = true; }, { passive: true });
+    modalHandle.addEventListener('touchmove', e => { if (!isDragging) return; currentY = e.touches[0].clientY; const diff = currentY - startY; if (diff > 0) sheet.style.transform = 'translateY(' + diff + 'px)'; }, { passive: true });
+    modalHandle.addEventListener('touchend', () => { if (!isDragging) return; isDragging = false; const diff = currentY - startY; sheet.style.transform = ''; if (diff > 100) closeModal(); }, { passive: true });
 
     attachCardListeners();
   </script>
